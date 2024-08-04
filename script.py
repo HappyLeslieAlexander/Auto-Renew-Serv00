@@ -12,7 +12,7 @@ accounts = [
 
 # SMTP配置
 smtp_server = os.getenv("SMTP_SERVER")
-smtp_port = os.getenv("SMTP_PORT")
+smtp_port = int(os.getenv("SMTP_PORT"))
 smtp_username = os.getenv("EMAIL_USERNAME")
 smtp_password = os.getenv("EMAIL_PASSWORD")
 recipient_email = os.getenv("TO_EMAIL")
@@ -21,7 +21,7 @@ recipient_email = os.getenv("TO_EMAIL")
 def login_and_check(account):
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch()
+            browser = p.chromium.launch(headless=True)
             page = browser.new_page()
             login_url = f"https://panel{account['panel_index']}.serv00.com/login/?next=/"
             page.goto(login_url)
@@ -30,18 +30,12 @@ def login_and_check(account):
             page.fill('#id_username', account['username'])
             page.fill('#id_password', account['password'])
 
-            # 提交登录表单
-            login_button = page.query_selector('#submit')
-            if login_button:
-                login_button.click()
-            else:
-                return f"账号 {account['username']} 登录失败：无法找到登录按钮"
-
-            # 等待页面导航
-            page.wait_for_navigation()
+            # 提交登录表单并等待导航
+            with page.expect_navigation():
+                page.click('#submit')
 
             # 判断是否登录成功
-            is_logged_in = page.evaluate("document.querySelector('a[href=\"/logout/\"]') !== null")
+            is_logged_in = page.query_selector('a[href="/logout/"]') is not None
             browser.close()
 
             if is_logged_in:
